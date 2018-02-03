@@ -29,11 +29,11 @@ func TestInMemoryCacheExpiry(t *testing.T) {
 
 	c.Store("key", &res, 2*time.Millisecond)
 
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(1 * time.Microsecond)
 
 	equals(t, res, *c.Get("key"))
 
-	time.Sleep(2 * time.Millisecond)
+	time.Sleep(3 * time.Millisecond)
 
 	assert(t, c.Get("key") == nil, "key should have expired")
 }
