@@ -124,7 +124,19 @@ func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Hand
 			}
 
 			token := hd[len("Bearer "):]
+
+			if opt.cache != nil {
+				if res := opt.cache.Get(token); res != nil {
+					next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{res, nil})))
+					return
+				}
+			}
+
 			res, err := introspect(token, *opt)
+
+			if err != nil && opt.cache != nil {
+				opt.cache.Store(token, res, opt.cacheExp)
+			}
 
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{res, err})))
 		})
