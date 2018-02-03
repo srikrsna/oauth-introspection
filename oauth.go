@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	discoveryPath string = ".well-known/openid-configuration"
+	discoveryPath = ".well-known/openid-configuration"
 )
 
 // Options ...
@@ -296,7 +296,8 @@ type result struct {
 	Err    error
 }
 
-func FromContext(ctx context.Context) (*Result, error){
+// FromContext ...
+func FromContext(ctx context.Context) (*Result, error) {
 	if val, ok := ctx.Value(resKey).(*result); ok {
 		return val.Result, val.Err
 	}

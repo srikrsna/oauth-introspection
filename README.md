@@ -1,6 +1,6 @@
-# OAuth2 Introspection
+# OAuth2 Introspection Client
 
-Go middleware client library for the OAuth2 Introspection Spec ([rfc7662](https://tools.ietf.org/html/rfc7662 "Introspection Spec")). Its 100% compatible with standard `net/http`. Can be used with a variety of routers. Built using the new `content` package in Go 1.7 and hence only works for Go 1.7+. Can be easily extended as allowed in the spec. For more advanced examples refer to the [godoc](Fill).
+Go middleware client library for the OAuth2 Introspection Spec ([rfc7662](https://tools.ietf.org/html/rfc7662 "Introspection Spec")). Its 100% compatible with standard `net/http`. Can be used with a variety of routers. Built using the new `content` package in Go 1.7 and hence only works for Go 1.7+. Can be easily extended as allowed in the spec. For more advanced examples refer to the [godoc](https://godoc.org/github.com/srikrsna/oauth-introspection).
 
 
 ## Simple Example
