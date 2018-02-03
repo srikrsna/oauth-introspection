@@ -23,6 +23,9 @@ type Options struct {
 
 	endpoint string
 	Client   *http.Client
+
+	cache    Cache
+	cacheExp time.Duration
 }
 
 // Option ...
@@ -50,10 +53,12 @@ func WithAddedBody(b url.Values) Option {
 	}
 }
 
-// WithTimeout ...
-func WithTimeout(d time.Duration) Option {
+// WithCache uses provided cache to store and retrieve objects, if this option is passed caching will be used otherwise not used
+// exp is the expiry for each cache entry
+func WithCache(cache Cache, exp time.Duration) Option {
 	return func(opt *Options) {
-		opt.Client.Timeout = d
+		opt.cache = cache
+		opt.cacheExp = exp
 	}
 }
 
