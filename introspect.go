@@ -1,7 +1,6 @@
 package introspection
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -183,54 +181,31 @@ func introspect(token string, opt Options) (*Result, error) {
 	return extractIntrospectResult(res.Body)
 }
 
-var buffPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
-
 func extractIntrospectResult(r io.Reader) (*Result, error) {
-	buff := buffPool.Get().(*bytes.Buffer)
-	buff.Reset()
+	res := Result{
+		Optionals: make(map[string]json.RawMessage),
+	}
 
-	r = io.TeeReader(r, buff)
-
-	var all map[string]json.RawMessage
-	if err := json.NewDecoder(r).Decode(&all); err != nil {
+	if err := json.NewDecoder(r).Decode(&res.Optionals); err != nil {
 		return nil, err
 	}
 
-	var rlt Result
-	if err := json.NewDecoder(buff).Decode(&rlt); err != nil {
-		return nil, err
+	if val, ok := res.Optionals["active"]; ok {
+		if err := json.Unmarshal(val, &res.Active); err != nil {
+			return nil, err
+		}
+
+		delete(res.Optionals, "active")
 	}
 
-	buffPool.Put(buff)
-
-	rlt.All = all
-
-	return &rlt, nil
+	return &res, nil
 }
 
 // Result is the OAuth2 Introspection Result
 type Result struct {
-	Active   bool   `json:"active"`
-	Scope    string `json:"scope"`
-	ClientID string `json:"client_id"`
+	Active bool
 
-	Username  string `json:"username"`
-	TokenType string `json:"token_type"`
-
-	EXP int `json:"exp"`
-	IAT int `json:"iat"`
-	NBF int `json:"nbf"`
-
-	SUB string   `json:"sub"`
-	AUD []string `json:"aud"`
-	ISS string   `json:"iss"`
-	JTI string   `json:"jti"`
-
-	All map[string]json.RawMessage `json:"-"`
+	Optionals map[string]json.RawMessage
 }
 
 type resKeyType int

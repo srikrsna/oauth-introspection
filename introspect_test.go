@@ -75,52 +75,6 @@ func TestIntrospection(t *testing.T) {
 			},
 		},
 		{
-			name:  "All Optional Response Fields Correct",
-			token: "random-super-secret-token",
-			valid: func(t *testing.T) func(r *http.Request) bool {
-				return func(r *http.Request) bool {
-					token := baseValid(t, r)
-
-					equals(t, "random-super-secret-token", token)
-					return true
-				}
-			},
-
-			handler: func(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
-				return func(w http.ResponseWriter, r *http.Request) {
-					res, err := intro.FromContext(r.Context())
-
-					ok(t, err)
-
-					equals(t, true, res.Active)
-
-					equals(t, "scope", res.Scope)
-					equals(t, "client_id", res.ClientID)
-					equals(t, "username", res.Username)
-					equals(t, "access_token", res.TokenType)
-					equals(t, 20, res.EXP)
-					equals(t, 20, res.IAT)
-					equals(t, 23, res.NBF)
-					equals(t, "krsna", res.SUB)
-					equals(t, "aud", res.AUD)
-					equals(t, "iss", res.ISS)
-				}
-			},
-
-			data: map[string]interface{}{
-				"scope":      "scope",
-				"client_id":  "client_id",
-				"username":   "username",
-				"token_type": "access_token",
-				"exp":        20,
-				"iat":        20,
-				"nbf":        23,
-				"sub":        "krsna",
-				"aud":        "aud",
-				"iss":        "iss",
-			},
-		},
-		{
 			name:  "Additional Fields",
 			token: "random-super-secret-token",
 			valid: func(t *testing.T) func(r *http.Request) bool {
@@ -146,7 +100,7 @@ func TestIntrospection(t *testing.T) {
 						Role string `json:"role"`
 					}
 
-					json.Unmarshal(res.All["additional"], &role)
+					json.Unmarshal(res.Optionals["additional"], &role)
 
 					equals(t, "admin", role.Role)
 				}
