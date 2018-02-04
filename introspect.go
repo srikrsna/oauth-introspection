@@ -225,10 +225,10 @@ type Result struct {
 	IAT int `json:"iat"`
 	NBF int `json:"nbf"`
 
-	SUB string `json:"sub"`
-	AUD string `json:"aud"`
-	ISS string `json:"iss"`
-	JTI string `json:"jti"`
+	SUB string   `json:"sub"`
+	AUD []string `json:"aud"`
+	ISS string   `json:"iss"`
+	JTI string   `json:"jti"`
 
 	All map[string]json.RawMessage `json:"-"`
 }
