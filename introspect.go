@@ -1,6 +1,7 @@
 package introspection
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,11 +10,19 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
 	discoveryPath = ".well-known/openid-configuration"
+)
+
+var (
+	// ErrNoBearer is returned by FromContext function when no Bearer token was present
+	ErrNoBearer = errors.New("no bearer")
+	// ErrNoMiddleware is returned by FromContext when no value was set. It is due to the middleware not being called before this function.
+	ErrNoMiddleware = errors.New("introspection middleware didn't execute")
 )
 
 // Options ...
@@ -119,7 +128,7 @@ func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Hand
 			hd := r.Header.Get("Authorization")
 
 			if !strings.HasPrefix(hd, "Bearer ") {
-				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{Err: errors.New("bearer not found")})))
+				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{Err: ErrNoBearer})))
 				return
 			}
 
@@ -134,7 +143,7 @@ func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Hand
 
 			res, err := introspect(token, *opt)
 
-			if err != nil && opt.cache != nil {
+			if err == nil && opt.cache != nil {
 				opt.cache.Store(token, res, opt.cacheExp)
 			}
 
@@ -169,139 +178,57 @@ func introspect(token string, opt Options) (*Result, error) {
 		return nil, fmt.Errorf("status does not indicate success: code: %d, body: %v", res.StatusCode, res.Body)
 	}
 
-	if res.Header.Get("Content-Type") != "application/json" {
-		return nil, fmt.Errorf("invalid content-type: expected application/json got %s", res.Header.Get("Content-Type"))
-	}
-
 	return extractIntrospectResult(res.Body)
 }
 
+var buffPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
 func extractIntrospectResult(r io.Reader) (*Result, error) {
-	var rlt Result
-	var jObj map[string]json.RawMessage
-	if err := json.NewDecoder(r).Decode(&jObj); err != nil {
+	buff := buffPool.Get().(*bytes.Buffer)
+	buff.Reset()
+
+	r = io.TeeReader(r, buff)
+
+	var all map[string]json.RawMessage
+	if err := json.NewDecoder(r).Decode(&all); err != nil {
 		return nil, err
 	}
 
-	if v, ok := jObj["active"]; ok {
-		if err := json.Unmarshal(v, &rlt.Active); err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, errors.New("field 'active' missing from introspection response")
+	var rlt Result
+	if err := json.NewDecoder(buff).Decode(&rlt); err != nil {
+		return nil, err
 	}
 
-	if v, ok := jObj["scope"]; ok {
-		var scopes string
-		err := json.Unmarshal(v, &scopes)
-		if err != nil {
-			return nil, err
-		}
-		rlt.Scope = strings.Split(scopes, " ")
-		delete(jObj, "scope")
-	}
+	buffPool.Put(buff)
 
-	if v, ok := jObj["client_id"]; ok {
-		err := json.Unmarshal(v, &rlt.ClientID)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "client_id")
-	}
-
-	if v, ok := jObj["username"]; ok {
-		err := json.Unmarshal(v, &rlt.Username)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "username")
-	}
-
-	if v, ok := jObj["token_type"]; ok {
-		err := json.Unmarshal(v, &rlt.TokenType)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "token_type")
-	}
-
-	if v, ok := jObj["exp"]; ok {
-		err := json.Unmarshal(v, &rlt.EXP)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "exp")
-	}
-
-	if v, ok := jObj["iat"]; ok {
-		err := json.Unmarshal(v, &rlt.IAT)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "iat")
-	}
-
-	if v, ok := jObj["nbf"]; ok {
-		err := json.Unmarshal(v, &rlt.NBF)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "nbf")
-	}
-
-	if v, ok := jObj["sub"]; ok {
-		err := json.Unmarshal(v, &rlt.SUB)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "sub")
-	}
-	if v, ok := jObj["aud"]; ok {
-		err := json.Unmarshal(v, &rlt.AUD)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "aud")
-	}
-	if v, ok := jObj["iss"]; ok {
-		err := json.Unmarshal(v, &rlt.ISS)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "iss")
-	}
-	if v, ok := jObj["jti"]; ok {
-		err := json.Unmarshal(v, &rlt.JTI)
-		if err != nil {
-			return nil, err
-		}
-		delete(jObj, "jti")
-	}
-
-	rlt.Additional = jObj
+	rlt.All = all
 
 	return &rlt, nil
 }
 
 // Result is the OAuth2 Introspection Result
 type Result struct {
-	Active   bool
-	Scope    []string
-	ClientID string
+	Active   bool   `json:"active"`
+	Scope    string `json:"scope"`
+	ClientID string `json:"client_id"`
 
-	Username  string
-	TokenType string
+	Username  string `json:"username"`
+	TokenType string `json:"token_type"`
 
-	EXP int
-	IAT int
-	NBF int
+	EXP int `json:"exp"`
+	IAT int `json:"iat"`
+	NBF int `json:"nbf"`
 
-	SUB string
-	AUD string
-	ISS string
-	JTI string
+	SUB string `json:"sub"`
+	AUD string `json:"aud"`
+	ISS string `json:"iss"`
+	JTI string `json:"jti"`
 
-	Additional map[string]json.RawMessage
+	All map[string]json.RawMessage `json:"-"`
 }
 
 type resKeyType int
@@ -319,5 +246,5 @@ func FromContext(ctx context.Context) (*Result, error) {
 		return val.Result, val.Err
 	}
 
-	return nil, errors.New("introspection middleware didn't execute")
+	return nil, ErrNoMiddleware
 }

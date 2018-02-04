@@ -14,6 +14,7 @@ type Cache interface {
 	Store(key string, res *Result, exp time.Duration)
 }
 
+// NewInMemoryCache returns an in memory implementation of the Cache. Useful for testing and single instance apps.
 func NewInMemoryCache() Cache {
 	return &inMemoryCache{
 		results: make(map[string]*Result),
