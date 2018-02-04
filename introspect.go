@@ -80,7 +80,7 @@ func EndpointFromDiscovery(iss string) (string, error) {
 	discoveryURI := iss + discoveryPath
 
 	client := http.Client{
-		Timeout: 1 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
 	res, err := client.Get(discoveryURI)
@@ -112,7 +112,9 @@ func Must(v string, err error) string {
 func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Handler {
 
 	opt := &Options{
-		Client: &http.Client{},
+		Client: &http.Client{
+			Timeout: 2 * time.Second,
+		},
 		body:   url.Values{"token": {""}, "token_type_hint": {"access_token"}},
 		header: http.Header{"Content-Type": {"application/x-www-form-urlencoded"}, "Accept": {"application/json"}},
 
