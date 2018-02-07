@@ -71,7 +71,7 @@ func WithCache(cache Cache, exp time.Duration) Option {
 
 // EndpointFromDiscovery is helper function to get the introspection endpoint from the openid issuer/authority
 func EndpointFromDiscovery(iss string) (string, error) {
-	if iss[len(iss)-1] != '/' {
+	if len(iss) == 0 || iss[len(iss)-1] != '/' {
 		iss += "/"
 	}
 
