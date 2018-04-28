@@ -2,14 +2,9 @@ package introspection
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
-	"time"
 )
 
 const (
@@ -26,19 +21,7 @@ var (
 // Introspection ...
 func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Handler {
 
-	opt := &Options{
-		Client: &http.Client{
-			Timeout: 2 * time.Second,
-		},
-		body:   url.Values{"token": {""}, "token_type_hint": {"access_token"}},
-		header: http.Header{"Content-Type": {"application/x-www-form-urlencoded"}, "Accept": {"application/json"}},
-
-		endpoint: endpoint,
-	}
-
-	for _, apply := range opts {
-		apply(opt)
-	}
+	opt := makeOptions(endpoint, opts)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,38 +34,8 @@ func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Hand
 
 			token := hd[len("Bearer "):]
 
-			if opt.cache != nil {
-				if res := opt.cache.Get(token); res != nil {
-					next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{res, nil})))
-					return
-				}
-			}
-
-			res, err := introspect(token, *opt)
-
-			if err == nil && opt.cache != nil {
-				opt.cache.Store(token, res, opt.cacheExp)
-			}
-
+			res, err := introspectionResult(token, opt)
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{res, err})))
 		})
 	}
-}
-
-type resKeyType int
-
-const resKey = resKeyType(1)
-
-type result struct {
-	Result *Result
-	Err    error
-}
-
-// FromContext ...
-func FromContext(ctx context.Context) (*Result, error) {
-	if val, ok := ctx.Value(resKey).(*result); ok {
-		return val.Result, val.Err
-	}
-
-	return nil, ErrNoMiddleware
 }
