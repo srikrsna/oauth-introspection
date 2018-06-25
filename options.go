@@ -74,6 +74,7 @@ func EndpointFromDiscovery(iss string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer res.Body.Close()
 
 	var discoResp struct {
 		IntrospectionEndpoint string `json:"introspection_endpoint"`
