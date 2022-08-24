@@ -25,17 +25,29 @@ func Introspection(endpoint string, opts ...Option) func(http.Handler) http.Hand
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			hd := r.Header.Get("Authorization")
-
-			if !strings.HasPrefix(hd, "Bearer ") {
+			token := getTokenFromRequest(r)
+			if token == "" {
 				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{Err: ErrNoBearer})))
 				return
 			}
-
-			token := hd[len("Bearer "):]
 
 			res, err := introspectionResult(token, opt)
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resKey, &result{res, err})))
 		})
 	}
+}
+
+func getTokenFromRequest(r *http.Request) string {
+	hd := r.PostFormValue("access_token")
+	if hd != "" {
+		return hd
+	}
+
+	hd = r.Header.Get("Authorization")
+	if !strings.HasPrefix(hd, "Bearer ") {
+		return ""
+	}
+
+	token := hd[len("Bearer "):]
+	return token
 }

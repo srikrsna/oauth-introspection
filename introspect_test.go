@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,26 +116,52 @@ func TestIntrospection(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			ts := openIdServer(t, tc.valid(t), tc.data)
-			defer ts.Close()
+	t.Run("with access token in Authorization header", func(t *testing.T) {
+		for _, tc := range tt {
+			t.Run(tc.name, func(t *testing.T) {
+				ts := openIdServer(t, tc.valid(t), tc.data)
+				defer ts.Close()
 
-			if tc.options == nil {
-				tc.options = []intro.Option{}
-			}
+				if tc.options == nil {
+					tc.options = []intro.Option{}
+				}
 
-			handler := intro.Introspection(
-				intro.Must(intro.EndpointFromDiscovery(ts.URL)),
-				tc.options...,
-			)(http.HandlerFunc(tc.handler(t)))
+				handler := intro.Introspection(
+					intro.Must(intro.EndpointFromDiscovery(ts.URL)),
+					tc.options...,
+				)(http.HandlerFunc(tc.handler(t)))
 
-			req, res := httptest.NewRequest("GET", "/", nil), httptest.NewRecorder()
-			req.Header.Add("Authorization", "Bearer "+tc.token)
+				req, res := httptest.NewRequest("GET", "/", nil), httptest.NewRecorder()
+				req.Header.Add("Authorization", "Bearer "+tc.token)
 
-			handler.ServeHTTP(res, req)
-		})
-	}
+				handler.ServeHTTP(res, req)
+			})
+		}
+	})
+
+	t.Run("with access token in form body", func(t *testing.T) {
+		for _, tc := range tt {
+			t.Run(tc.name, func(t *testing.T) {
+				ts := openIdServer(t, tc.valid(t), tc.data)
+				defer ts.Close()
+
+				if tc.options == nil {
+					tc.options = []intro.Option{}
+				}
+
+				handler := intro.Introspection(
+					intro.Must(intro.EndpointFromDiscovery(ts.URL)),
+					tc.options...,
+				)(http.HandlerFunc(tc.handler(t)))
+
+				body := url.Values{"access_token": []string{tc.token}}
+				req, res := httptest.NewRequest("POST", "/", strings.NewReader(body.Encode())), httptest.NewRecorder()
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+				handler.ServeHTTP(res, req)
+			})
+		}
+	})
 }
 
 func TestWithCache(t *testing.T) {
